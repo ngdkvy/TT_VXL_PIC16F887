@@ -1,0 +1,429 @@
+//!void note()
+//!{
+//!Nguyen Dinh Khanh Vy - 22161043
+//!BT tong hop: Counter timer0, Timer1 dem thoi gian, Xu ly ngat
+//!1. Hien thi gia tri Counter va chu SP len 4 led 7 doan (co dau cham o giua)
+//!   Ban dau, 2 led trai hien thi gia tri Counter, 2 led phai hien thi chu SP
+//!a. Hien thi, co xoa so 0 vo nghia
+//!b. 1 nut nhan START/PAUSE (BT0)
+//!c. 1 nut nhan dao chieu dem (BT1)
+//!d. 1 nut nhan doi ben hien thi (BT2)
+//!2. Hien thi gia tri Counter va dem giay len 8 led 7 doan quet
+//!Led ben trai: dem san pham
+//!Led ben phai: dem giay
+//!Xu ly cau a, b, c, d giong cau 1
+//!e. 1 nut nhan doi chieu dem giay (BT2)
+//!3. Hien thi len LCD
+//!a.  Hien thi theo cu phap o hang 1: XX – YY – ZZ
+//!   XX: Gia tri cai (gia tri dem toi da)
+//!     YY: Gia tri dem (dem san pham)
+//!   ZZ: Dem giay (Timer1, Xu ly ngat)
+//!   Hang 2: Hien thi phim duoc nhan
+//!b. Dung ma tran phim
+//!    Phim 0: Tang gia tri cai cua Timer0
+//!    Phim 1: Giam gia tri cai cua Timer0
+//!    Phim 2: Reset gia tri cai = 01,  gia tri dem= 0
+//!c. Hien thi font to
+//!   Ban dau LCD hien thi voi cu phap o hang 3, 4: AA – SP voi la AA: dem giay
+//!   Thuc hien cac cau a, b, c, d
+
+//!BT0
+//!TT_SP = 0 => Pause
+//!TT_SP = 1 => Start
+
+//!BT1
+//!TT_DC = 0 => Dem len
+//!TT_DC = 1 => Dem xuong
+
+//!BT2
+//!TT_HT = 0 => Counter ben trai, SP ben phai
+//!TT_HT = 1 => Nguoc lai
+
+//!BT3
+//!TT_DG = 0 => Giay dem len
+//!TT_DG = 1 => Giay dem xuong
+//!}
+
+#include <tv_pickit2_shift_1.c>
+//!#include <tv_pickit2_shift_1_proteus.c>
+#include <tv_pickit2_shift_lcd.c> 
+#include <tv_pickit2_shift_key4x4_138.c> 
+//!#include <tv_pickit2_shift_key4x4_138_proteus.c> 
+unsigned int8    t0, tmax;
+unsigned int8    donvi, chuc;
+unsigned int8    dv, ch, tr, ng, tri, ctr;
+unsigned int8    ch_to, dv_to;
+signed int8       giay, bdn;
+signed int8  mp, i, vt;
+const unsigned char chuP[] = {7, 6, 7, 7, 32, 32};
+int1 TT_SP, TT_HT, TT_DC, TT_DG;
+
+//!Chuong trinh ngat
+#int_timer1
+void interrupt_timer1()
+{
+    bdn++;
+    set_timer1(3036);
+} 
+
+//!Phim nhan Start/Pause + in ra LCD phim BT0 duoc nhan
+void phim_SP()
+{
+   if (!input(BT0))
+   {
+      delay_ms(20);
+      if (!input(BT0))
+      {
+//!         Dao trang thai bien
+         TT_SP= ~ TT_SP;
+         
+//!         Thong bao nut duoc nhan
+         lcd_goto_xy(1,14);  
+         lcd_data("BT0"); 
+         
+         while (!input(BT0));
+      }
+   }
+} 
+
+//!Phim nhan dao chieu + in ra LCD phim BT1 duoc nhan
+void phim_DC()
+{
+   if (!input(BT1))
+   {
+      delay_ms(20);
+      if (!input(BT1))
+      {
+//!         Dao trang thai bien
+         TT_DC = ~ TT_DC;
+         
+//!         Thong bao nut duoc nhan         
+         lcd_goto_xy(1,14);  
+         lcd_data("BT1"); 
+         while (!input(BT1));
+      }
+   }
+} 
+
+//!Phim nhan dao hien thi + in ra LCD phim BT2 duoc nhan
+void phim_HT()
+{
+   if (!input(BT2))
+   {
+      delay_ms(20);
+      if (!input(BT2))
+      {
+//!         Dao trang thai bien
+         TT_HT = ~ TT_HT;
+         
+//!         Thong bao nut duoc nhan
+         lcd_goto_xy(1,14);  
+         lcd_data("BT2"); 
+         
+//!Xoa cac ky tu chu to tren LCD o hang 2, 3        
+         lcd_goto_xy(2,10);
+         for (i = 0; i<=10; i ++)
+            lcd_data(0x20);
+         lcd_goto_xy(3,10);
+         for (i = 0; i<=10; i ++)
+            lcd_data(0x20);
+            
+         while (!input(BT2));
+      }
+   }
+} 
+
+//!Phim nhan dao chieu dem giay + in ra LCD phim BT3 duoc nhan
+void phim_DG()
+{
+   if (!input(BT3))
+   {
+      delay_ms(20);
+      if (!input(BT3))
+      {
+//!         Dao trang thai bien
+         TT_DG = ~ TT_DG;
+         
+//!         Thong bao nut duoc nhan
+         lcd_goto_xy(1,14);  
+         lcd_data("BT3"); 
+         while (!input(BT3));
+      }
+   }
+} 
+
+//!Function hien thi so to ra LCD
+void lcd_hienthi_so_z_toado_xy(signed int8 lcd_so, x1, y1)
+{
+   lcd_goto_xy(x1,y1); 
+   for (i=0;i<6;i++)
+   {
+      if (i==3)   lcd_goto_xy(x1+1,y1); 
+      lcd_data(lcd_so_x[lcd_so][i]);
+   }
+}
+
+//!Function hien thi chu P ra LCD
+void lcd_hienthi_chuP(signed int8 x2, y2)
+{
+   lcd_goto_xy(x2,y2); 
+   for (i=0;i<6;i++)
+   {
+      if (i==3)   lcd_goto_xy(x2+1,y2); 
+      lcd_data(chuP[i]);
+   }
+}
+
+//!Xoa so 0 vo nghia cua font to
+void xu_ly_so_to_xoa_0_vo_nghia(unsigned int16 so)
+{
+   ch_to = so/10;
+   dv_to = so%10;
+   
+//!Tai mang lcd_so_x[10][i] la mang trang nen gan ch_to = 10 de cho so 0 vo nghia thanh mang trang
+   if(ch_to == 0) ch_to = 10;
+}
+
+//!Module 4 led 7 doan: In ra gia tri counter va chu SP + xoa so 0 vo nghia + dao ben hien thi 
+void  giai_ma_hien_thi (unsigned int16 tam)
+{
+//!   Luu so de hien thi ra LED 
+   donvi = ma7doan[tam %10];
+   chuc  = ma7doan[tam/10%10]; 
+   
+//!   Xoa so 0 vo nghia
+   if (chuc==0xc0)   chuc=0xff;
+}
+
+//!Module 8 led 7 doan quet: In ra gia tri counter va dem giay + xoa so 0 vo nghia + dao ben hien thi
+void giai_ma_gan_cho_8led_quet()
+{
+//!   Xu ly dao ben hien thi
+   if (!TT_HT)
+   {
+//!   Luu so de hien thi ra LED 
+//!   Hien thi dem giay
+      led_7dq[0] = ma7doan [giay %10];
+      led_7dq[1] = ma7doan [giay/10];
+//!   Hien thi dem san pham
+      led_7dq[6] = ma7doan [t0 %10];
+      led_7dq[7] = ma7doan [t0/10];
+      
+      if (led_7dq[1] == 0xc0) led_7dq[1] = 0xff;
+      if (led_7dq[7] == 0xc0) led_7dq[7] = 0xff;
+   }
+   else
+   {
+//!   Luu so de hien thi ra LED 
+//!   Hien thi dem giay
+      led_7dq[6] = ma7doan [giay %10];
+      led_7dq[7] = ma7doan [giay/10];
+//!   Hien thi dem san pham
+      led_7dq[0] = ma7doan [t0 %10];
+      led_7dq[1] = ma7doan [t0/10];
+      
+//!   Xoa so 0 vo nghia      
+      if (led_7dq[7] == 0xc0) led_7dq[7] = 0xff;
+      if (led_7dq[1] == 0xc0) led_7dq[1] = 0xff;
+   }
+}
+
+//!Ma tran phim: Tang, giam gia tri cai, Reset gia tri cai + gia tri Counter
+void Xu_ly_phim_nhan()
+{
+   if (mp < 10)
+   {
+//!   Hien thi LCD phim duoc nhan 0 -> 9
+      lcd_goto_xy(1,14);  
+      lcd_data("  "); //De xoa chu BT neu nut nhan don duoc nhan truoc
+      lcd_data(mp+0x30); 
+      
+//!   Phim 0: tang gia tri cai
+      if (mp == 0)
+      {
+         tmax++;
+//!      Gioi han gia tri cai toi da: 99
+         if (tmax == 100)    tmax = 99;
+      }
+      
+//!   Phim 1: giam gia tri cai
+      if (mp == 1)
+      {
+         tmax --;
+//!      Gioi han gia tri cai toi thieu: 00
+         if (tmax == 0)      tmax = 0;
+      }
+      
+//!   Phim 2: Reset gia tri cai = 2, gia tri dem = 0
+      if (mp == 2)
+      {
+         tmax = 1;
+         set_timer0(0);
+         t0 = 0;
+      }
+   }
+   else 
+   {
+//!   Hien thi LCD phim duoc nhan A -> F 
+      lcd_goto_xy(1,14);  
+      lcd_data("  ");//De xoa chu BT neu nut nhan don duoc nhan truoc
+      lcd_data(mp+0x37);
+   }
+}
+
+//!Function xu ly xoa so 0 vo nghia cua gia tri cai, gia tri dem, dem giay
+void GM_LCD()
+{
+//!   Luu so de hien thi ra LCD 
+//!   Hien thi gia tri cai
+   dv = tmax%10+0x30;
+   ch = tmax/10+0x30; 
+//!   Xoa so 0 vo nghia
+   if (ch == 0x30)   ch = 0x20;
+   
+//!   Luu so de hien thi ra LCD 
+//!   Hien thi gia tri dem  
+   tr = t0%10+0x30;
+   ng = t0/10+0x30; 
+//!   Xoa so 0 vo nghia
+   if (ng == 0x30)   ng = 0x20;
+ 
+//!   Luu so de hien thi ra LCD 
+//!   Hien thi giay dang dem
+   tri = giay%10+0x30;
+   ctr = giay/10+0x30; 
+//!   Xoa so 0 vo nghia
+   if (ctr == 0x30)   ctr = 0x20;
+}
+
+//!Hien thi gia tri cai, gia tri dem, dem giay da xoa so 0 vo nghia len LCD
+void hienthi_lcd()
+{
+   lcd_goto_xy(0,0);
+   lcd_data(ch); 
+   lcd_data(dv);
+   
+   lcd_goto_xy(0,5);
+   lcd_data(ng); 
+   lcd_data(tr);
+   
+   lcd_goto_xy(0,10);
+   lcd_data(ctr); 
+   lcd_data(tri);
+   
+   lcd_goto_xy(1,0);
+   lcd_data("Phim nhan: "); 
+}
+
+void main()
+{
+//!   Khoi tao ban dau + LCD
+   set_up_port_ic_chot();
+   setup_lcd();
+   set_tris_b(0x3c); 
+//!   Cai dat timer0
+   setup_timer_0 (t0_ext_l_to_h | t0_div_1| t0_8_bit); 
+   set_timer0(0);
+   
+//!   Cai dat Timer1 + Xu ly ngat
+   setup_timer_1(t1_internal | t1_div_by_8);
+   set_timer1(3036);
+   enable_interrupts(global); 
+   enable_interrupts(int_timer1); 
+   
+//!   Khoi tao gia tri ban dau
+   giay = bdn = 0;
+   TT_SP = TT_HT = TT_DC = TT_DG = 0;
+   t0 = 0;
+   tmax = 99;
+   vt = 0; //!Bien luu vi tri in tren LCD cua giay
+   
+//!   Luu cac doan a, b, c, e, f, g+d vao CGRAM
+   lcd_command(0x40);
+   for (i=0;i<64;i++)  {  lcd_data(lcd_ma_8doan[i]); }
+   
+//!Hien thi ra LCD trang thai ban dau
+   lcd_goto_xy(0,0);
+   lcd_data("   -    -   "); 
+   GM_LCD();
+   hienthi_lcd();
+   lcd_hienthi_so_z_toado_xy(0,2,vt+3);
+   
+   while(true)
+   {
+//!   Doc gia tri Counter
+      t0 = get_timer0();
+      
+//!   Kiem tra phim nhan
+      phim_SP();
+      phim_HT();
+      phim_DC();
+      phim_DG();
+      
+//!   Doc gia tri ma tran phim + Kiem tra ma tran phim co duoc nhan khong? + Goi ham xu ly yeu cau lien quan
+      mp = key_4x4_up();                                                                                                                           //!Nguyen Dinh Khanh Vy - 22161043
+      if (mp != 0xff)                                                                                                                                                         
+      {
+         Xu_ly_phim_nhan();
+         GM_LCD();
+         hienthi_lcd();
+      }
+//!   Xu ly Start/Pause
+      if (!TT_SP) 
+         setup_timer_0(t0_off);
+      else
+         setup_timer_0 (t0_ext_l_to_h | t0_div_1| t0_8_bit); 
+       
+//!      Xu ly dao chieu dem len, dem xuong
+      if (!TT_DC)
+         t0 = get_timer0();
+      else 
+         t0 = tmax - get_timer0();                                                                                                                                   //!Nguyen Dinh Khanh Vy - 22161043
+      if ((t0 > tmax) && (!TT_DC))
+         t0 = set_timer0(1);
+      if ((!t0) && (TT_DC))
+         set_timer0(0);   
+
+//!      Hien len module 4 LED 7 doan + 8 led 7 doan quet
+      giai_ma_hien_thi (t0);
+      giai_ma_gan_cho_8led_quet();
+      
+      //!   Xu ly dao ben hien thi cua LCD, 4 Led 7 doan khi nhan phim BT2
+      if (!TT_HT)
+      {
+         vt = 0;
+         lcd_hienthi_so_z_toado_xy(5,2,vt+7);
+         lcd_hienthi_chuP(2,vt+10);
+         xuat_4led_7doan_4so(chuc,donvi &0x7f, 0x92, 0x8c);
+      }
+      else 
+      {
+         vt = 7;
+         lcd_hienthi_so_z_toado_xy(5,2,vt-7);
+         lcd_hienthi_chuP(2,vt-4);
+         xuat_4led_7doan_4so(0x92, 0x0c, chuc,donvi);
+      }
+      
+//!      Xu ly phan dem giay cua timer1
+      if    (bdn<10)    
+      {
+         hien_thi_8led_7doan_quet();
+      }
+      else
+      {
+         bdn = bdn-10;
+         if (!TT_DG)    giay++;
+         else           giay --;
+         if (giay == 60)  giay = 0;
+         if (giay < 0)  giay = 59;
+         
+//!      Hien thi len LCD       
+         GM_LCD();
+         hienthi_lcd();
+         xu_ly_so_to_xoa_0_vo_nghia(giay);
+         lcd_hienthi_so_z_toado_xy(ch_to,2,vt); 
+         lcd_hienthi_so_z_toado_xy(dv_to,2,vt+3);
+      }
+      delay_ms(100); //!Giam tan xuat xu ly cua PIC16F887, danh cho mo phong
+   }
+}
